@@ -1,22 +1,39 @@
 package org.firstinspires.ftc.teamcode.opmodes.teleop
 
+import android.util.Log
 import com.acmerobotics.dashboard.FtcDashboard
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
+import com.qualcomm.robotcore.util.ElapsedTime
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 import org.firstinspires.ftc.teamcode.drivers.range.vl53l0x.VL53L0X
+import java.util.concurrent.atomic.AtomicInteger
 
 @TeleOp
 class VL53L0XSimpleRangeTest : LinearOpMode() {
-    override fun runOpMode() {
+
+    private fun log(msg: String) = Log.i("VL53L0XSimpleRangeTest","[${Thread.currentThread().name}] $msg")
+
+    override fun runOpMode()  {
         val dashboard = FtcDashboard.getInstance()
         val telemetry = MultipleTelemetry(telemetry, dashboard.telemetry)
-        val depthSensor = hardwareMap.get(VL53L0X::class.java, "vl53l0x")
 
-        waitForStart()
-        while (opModeIsActive()) {
-            telemetry.addData("Range (mm)", depthSensor.range)
-            telemetry.update()
+        // here we should use the "use" method to ensure that the VL53L0X is closed when we are done with it
+        // this way it ends its coroutine
+        hardwareMap.get(VL53L0X::class.java, "vl53l0x").use { rangeSensor ->
+            val timer = ElapsedTime()
+
+            waitForStart()
+            while (opModeIsActive()) {
+                timer.reset()
+                val range = rangeSensor.getRange()
+                val elapsedTime = timer.milliseconds()
+                telemetry.addData("Range (mm)", range)
+                telemetry.addData("Loop Time (ms)", elapsedTime)
+                telemetry.update()
+            }
         }
     }
 }

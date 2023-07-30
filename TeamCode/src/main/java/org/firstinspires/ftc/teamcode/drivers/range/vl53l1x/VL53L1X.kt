@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.drivers.range
+package org.firstinspires.ftc.teamcode.drivers.range.vl53l1x
 
 import com.qualcomm.robotcore.hardware.HardwareDevice
 import com.qualcomm.robotcore.hardware.I2cAddr
