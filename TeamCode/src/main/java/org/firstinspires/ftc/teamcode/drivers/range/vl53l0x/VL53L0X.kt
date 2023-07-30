@@ -25,6 +25,10 @@ import kotlin.experimental.and
 import kotlin.experimental.inv
 import kotlin.experimental.or
 
+// Lots of code in this class is based on the code from the following sources:
+// https://www.artfulbytes.com/vl53l0x-post
+// https://github.com/FIRST-Tech-Challenge/ftcrobotcontroller/wiki/Writing-an-I2C-Driver
+
 @I2cDeviceType
 @DeviceProperties(name = "VL53L0X ToF Laser Ranging Sensor", xmlTag = "VL53L0X")
 class VL53L0X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :

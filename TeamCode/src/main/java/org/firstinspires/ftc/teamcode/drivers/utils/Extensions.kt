@@ -12,3 +12,4 @@ infix fun Short.shr(bits: Int): Short {
 infix fun Short.shl(bits: Int): Short {
     return ((this.toInt() shl bits) and 0xFFFF).toShort()
 }
+
