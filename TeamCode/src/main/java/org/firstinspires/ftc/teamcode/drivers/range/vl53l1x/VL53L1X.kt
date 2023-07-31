@@ -244,6 +244,7 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
     private fun initializeSensor() {
         runBlocking {
             writeBytes(DEFAULT_CONFIG_START_INDEX, VL53L1X_DEFAULT_CONFIGURATION)
+            Log.i("VL53L1X", "loaded default configuration")
 
             // we just start and stop ranging here to get the sensor to initialize
             startRanging()
@@ -254,41 +255,43 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
 
             writeByte(VL53L1_VHV_CONFIG__TIMEOUT_MACROP_LOOP_BOUND,0x09) // two bounds VHV
             writeByte(0x0B, 0) // start VHV from the previous temperature
+
         }
     }
-    fun start() : Closeable {
+    fun start()  {
         if(!hasContinuousRangingBeenStarted) {
 
             startRanging()
 
             getRangeJob = CoroutineScope(Dispatchers.IO).launch {
-                val measurementTime = ElapsedTime()
+                Log.i("VL53L1X", "getRangeJob started")
+                val intermeasurementTime = getInterMeasurementInMs().toLong()
+                Log.i("VL53L1X", "intermeasurementTime: $intermeasurementTime")
+                Log.i("VL53L1X", "timing budget: ${getTimingBudgetInMs()}")
                 while (this.isActive) {
 
                     // TODO: Add a timeout here
                     while(!isDataReady())
-                        delay(1)
+                        delay(intermeasurementTime / 2)
 
                     val range = getDistance()
                     currentRange.set(range.toInt())
 
                     clearInterrupt()
-
-                    val rangingIntervalMs = measurementTime.milliseconds()
-                    measurementTime.reset()
-
-                    delay(rangingIntervalMs.toLong() / 2) // sample at half the measurement interval (2x frequency)
                 }
+                Log.i("VL53L1X", "getRangeJob ended")
+
             }
             hasContinuousRangingBeenStarted = true
         }
-        return this
     }
     private fun startRanging() {
         writeByte(SYSTEM__MODE_START, 0x40)
+        Log.i("VL53L1X", "started ranging")
     }
     private fun stopRanging() {
         writeByte(SYSTEM__MODE_START, 0x00)
+        Log.i("VL53L1X", "stopped ranging")
     }
     private fun clearInterrupt() {
         writeByte(SYSTEM__INTERRUPT_CLEAR, 0x01)
@@ -304,7 +307,8 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
     }
 
     private fun getInterruptPolarity(): InterruptPolarity {
-     return if(readByte(GPIO_HV_MUX__CTRL) and 0x10.toByte() == 0x10.toByte()) InterruptPolarity.ACTIVE_HIGH else InterruptPolarity.ACTIVE_LOW
+        //set bit 4 to 0 for active high interrupt and 1 for active low (bits 3:0 must be 0x1)
+        return if(readByte(GPIO_HV_MUX__CTRL) and 0x10.toByte() == 0x10.toByte()) InterruptPolarity.ACTIVE_LOW else InterruptPolarity.ACTIVE_HIGH
     }
     /**
      * Function to get the distance mode of the VL53L1X sensor.

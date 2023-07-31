@@ -8,21 +8,23 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 import com.qualcomm.robotcore.util.ElapsedTime
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import org.firstinspires.ftc.teamcode.drivers.range.vl53l0x.VL53L0X
-import java.util.concurrent.atomic.AtomicInteger
+import org.firstinspires.ftc.teamcode.drivers.range.vl53l1x.VL53L1X
 
 @TeleOp
-class VL53L0XSimpleRangeTest : LinearOpMode() {
+class VL53L1XSimpleRangeTest : LinearOpMode() {
     override fun runOpMode()  {
         val dashboard = FtcDashboard.getInstance()
         val telemetry = MultipleTelemetry(telemetry, dashboard.telemetry)
 
         // here we should use the "use" method to ensure that the VL53L0X is closed when we are done with it
         // this way it ends its coroutine
-        hardwareMap.get(VL53L0X::class.java, "vl53l0x").use { rangeSensor ->
-            val timer = ElapsedTime()
+        val rangeSensor = hardwareMap.get(VL53L1X::class.java, "vl53l1x")
+        val timer = ElapsedTime()
 
-            waitForStart()
+        waitForStart()
+        Log.i("VL53L1X", "Starting from OpMode")
+        rangeSensor.use {
+            rangeSensor.start()
             while (opModeIsActive()) {
                 timer.reset()
                 val range = rangeSensor.getRange()
@@ -31,6 +33,7 @@ class VL53L0XSimpleRangeTest : LinearOpMode() {
                 telemetry.addData("Loop Time (ms)", elapsedTime)
                 telemetry.update()
             }
+            rangeSensor.stop()
         }
     }
 }
