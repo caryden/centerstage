@@ -8,7 +8,6 @@ import com.qualcomm.robotcore.hardware.I2cDeviceSynchDevice
 import com.qualcomm.robotcore.hardware.I2cWaitControl
 import com.qualcomm.robotcore.hardware.configuration.annotations.DeviceProperties
 import com.qualcomm.robotcore.hardware.configuration.annotations.I2cDeviceType
-import com.qualcomm.robotcore.util.ElapsedTime
 import com.qualcomm.robotcore.util.TypeConversion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,18 +17,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import org.firstinspires.ftc.teamcode.drivers.range.vl53l0x.VL53L0X
 import org.firstinspires.ftc.teamcode.drivers.utils.shl
 import org.firstinspires.ftc.teamcode.drivers.utils.shr
 import java.io.Closeable
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.experimental.and
 
-// Built from guidance derived from:
-// https://github.com/FIRST-Tech-Challenge/ftcrobotcontroller/wiki/Writing-an-I2C-Driver
-// https://www.st.com/en/imaging-and-photonics-solutions/vl53l1x.html#documentation
-//
-// TODO: add calibration support, add ROI support
+/** Built from guidance derived from:
+ * https://github.com/FIRST-Tech-Challenge/ftcrobotcontroller/wiki/Writing-an-I2C-Driver
+ * https://www.st.com/en/imaging-and-photonics-solutions/vl53l1x.html#documentation
+ * TODO: add calibration support, add ROI support
+*/
 @I2cDeviceType
 @DeviceProperties(name = "VL53L1X ToF Laser Ranging Sensor", xmlTag = "VL53L1X")
 class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
@@ -84,6 +82,7 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
         private val VL53L1_EXPECTED_MODEL_TYPE = 0xCC.toByte()
         private val VL53L1_EXPECTED_MASK_REVISION = 0x10.toByte()
 
+        val VL53L1X_DEFAULT_ROI = ROI(0,0,16,16, "Default/Full 16x16 SPAD Array ROI")
         private val VL53L1X_DEFAULT_CONFIGURATION = byteArrayOf(
             0x00.toByte(), // 0x2d : set bit 2 and 5 to 1 for fast plus mode (1MHz I2C), else don't touch
             0x00.toByte(), // 0x2e : bit 0 if I2C pulled up at 1.8V, else set bit 0 to 1 (pull up at AVDD)
@@ -177,8 +176,56 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
             0x00.toByte(), // 0x86 : clear interrupt, use ClearInterrupt()
             0x00.toByte()  // 0x87 : start ranging, use StartRanging() or StopRanging(), If you want an automatic start after VL53L1X_init() call, put 0x40 in location 0x87
         )
+
+        /**
+         * This represents the minimum spad width of 4 hoizontally, with the full 16 vertically.
+         * These go the opposite direction (in X values) because they are reversed vs the FoV
+         * (i.e. when the rightmost spad is triggered it is from the left side of the FoV)
+         * These are setup to scan left to right of the FoV so we scan reversed on the SPAD matrix.
+         */
+        val FULL_SPREAD_13ZONE_4SPAD_ROI_LIST = listOf<ROI>(
+            ROI(12,0,4,16,"Full Spread - Zone 1"),
+            ROI(11,0,4,16,"Full Spread - Zone 2"),
+            ROI(10,0,4,16,"Full Spread - Zone 3"),
+            ROI(9,0,4,16,"Full Spread - Zone 4"),
+            ROI(8,0,4,16,"Full Spread - Zone 5"),
+            ROI(7,0,4,16,"Full Spread - Zone 6"),
+            ROI(6,0,4,16,"Full Spread - Zone 7"),
+            ROI(5,0,4,16,"Full Spread - Zone 8"),
+            ROI(4,0,4,16,"Full Spread - Zone 9"),
+            ROI(3,0,4,16,"Full Spread - Zone 10"),
+            ROI(2,0,4,16,"Full Spread - Zone 11"),
+            ROI(1,0,4,16,"Full Spread - Zone 12"),
+            ROI(0,0,4,16,"Full Spread - Zone 13")
+        )
+        val SPREAD_11ZONE_6SPAD_ROI_LIST = listOf<ROI>(
+            ROI(10,0,6,16,"11 Zone/6 Wide - Zone 1"),
+            ROI(9,0,6,16,"11 Zone/6 Wide - Zone 2"),
+            ROI(8,0,6,16,"11 Zone/6 Wide - Zone 3"),
+            ROI(7,0,6,16,"11 Zone/6 Wide - Zone 4"),
+            ROI(6,0,6,16,"11 Zone/6 Wide - Zone 5"),
+            ROI(5,0,6,16,"11 Zone/6 Wide - Zone 6"),
+            ROI(4,0,6,16,"11 Zone/6 Wide - Zone 7"),
+            ROI(3,0,6,16,"11 Zone/6 Wide - Zone 8"),
+            ROI(2,0,6,16,"11 Zone/6 Wide - Zone 9"),
+            ROI(1,0,6,16,"11 Zone/6 Wide - Zone 10"),
+            ROI(0,0,6,16,"11 Zone/6 Wide - Zone 11")
+        )
+        val SPREAD_9ZONE_8SPAD_ROI_LIST = listOf<ROI>(
+            ROI(8,0,8,16,"8 Zone/8 Wide - Zone 1"),
+            ROI(7,0,8,16,"8 Zone/8 Wide - Zone 2"),
+            ROI(6,0,8,16,"8 Zone/8 Wide - Zone 3"),
+            ROI(5,0,8,16,"8 Zone/8 Wide - Zone 4"),
+            ROI(4,0,8,16,"8 Zone/8 Wide - Zone 5"),
+            ROI(3,0,8,16,"8 Zone/8 Wide - Zone 6"),
+            ROI(2,0,8,16,"8 Zone/8 Wide - Zone 7"),
+            ROI(1,0,8,16,"8 Zone/8 Wide - Zone 8"),
+            ROI(0,0,8,16,"8 Zone/8 Wide - Zone 9")
+        )
+
     }
-    private var currentRange = AtomicInteger(0)
+    private val currentRangingResult = AtomicReference<RangingResult>(RangingResult(0, VL53L1X_DEFAULT_ROI))
+    private val roiList = AtomicReference<List<ROI>>(listOf(VL53L1X_DEFAULT_ROI))
     private var getRangeJob : Job? = null
     private var hasContinuousRangingBeenStarted = false
 
@@ -192,8 +239,8 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
         // Sensor starts off disengaged so we can change things like I2C address. Need to engage
         this.deviceClient.engage();
     }
-    fun getRange() : Int {
-        return currentRange.get()
+    fun getRangingResult() : RangingResult {
+        return currentRangingResult.get()
     }
     fun stop() {
         if (hasContinuousRangingBeenStarted)
@@ -217,6 +264,10 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
         return if (validateBootupAndI2CCommunication()) {
             Log.i("VL53L1X", "i2c communication validated and sensor booted up")
             initializeSensor()
+            setDistanceMode(DistanceMode.SHORT)
+            setTimingBudgetInMs(15)
+            setInterMeasurementInMs(15)
+
             true
         } else false
     }
@@ -258,26 +309,53 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
 
         }
     }
+    fun setRegionsOfInterest(roiList: List<ROI>) {
+         this.roiList.set(roiList)
+    }
     fun start()  {
         if(!hasContinuousRangingBeenStarted) {
 
-            startRanging()
 
             getRangeJob = CoroutineScope(Dispatchers.IO).launch {
                 Log.i("VL53L1X", "getRangeJob started")
                 val intermeasurementTime = getInterMeasurementInMs().toLong()
                 Log.i("VL53L1X", "intermeasurementTime: $intermeasurementTime")
                 Log.i("VL53L1X", "timing budget: ${getTimingBudgetInMs()}")
+
+                var currentROIIndex = 0
+                var rangingROI = roiList.get()[currentROIIndex]
+
+                setROI(rangingROI)
+                startRanging()
+
                 while (this.isActive) {
+
+                    // the ROI is locked into the sensor when each ranging cycle starts, so we need
+                    // to set the nextROI before we start the next ranging cycle (during this cycle)
+                    // now if there is more than one ROI in the list, we need to switch to the next one
+                    if(currentROIIndex + 1 >= roiList.get().size)
+                        currentROIIndex = 0
+                    else
+                        currentROIIndex++
+
+                    var nextROI = roiList.get()[currentROIIndex]
+
+                    // only update the ROI if it has actually changed (values)
+                    if(nextROI != rangingROI) {
+                        // if the width/height of the ROI has not changed, we only need to update the center
+                        // the application note recommends this
+                        val justUpdateCenter = nextROI.spadHeight == rangingROI.spadHeight && nextROI.spadWidth == rangingROI.spadWidth
+                        setROI(nextROI, justUpdateCenter)
+                    }
 
                     // TODO: Add a timeout here
                     while(!isDataReady())
                         delay(intermeasurementTime / 2)
-
                     val range = getDistance()
-                    currentRange.set(range.toInt())
 
+                    currentRangingResult.set(RangingResult(range.toInt(), rangingROI, currentROIIndex))
                     clearInterrupt()
+                    rangingROI = nextROI
                 }
                 Log.i("VL53L1X", "getRangeJob ended")
 
@@ -305,7 +383,6 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
             InterruptPolarity.ACTIVE_LOW -> interruptStatus and bitMask == 0.toByte()
             }
     }
-
     private fun getInterruptPolarity(): InterruptPolarity {
         //set bit 4 to 0 for active high interrupt and 1 for active low (bits 3:0 must be 0x1)
         return if(readByte(GPIO_HV_MUX__CTRL) and 0x10.toByte() == 0x10.toByte()) InterruptPolarity.ACTIVE_LOW else InterruptPolarity.ACTIVE_HIGH
@@ -327,20 +404,20 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
 
         when(distanceMode) {
             DistanceMode.SHORT -> {
-                writeByte(PHASECAL_CONFIG__TIMEOUT_MACROP, 0x14);
-                writeByte(RANGE_CONFIG__VCSEL_PERIOD_A, 0x07);
-                writeByte(RANGE_CONFIG__VCSEL_PERIOD_B, 0x05);
-                writeByte(RANGE_CONFIG__VALID_PHASE_HIGH, 0x38);
-                writeShort(SD_CONFIG__WOI_SD0, 0x0705);
-                writeShort(SD_CONFIG__INITIAL_PHASE_SD0, 0x0606);
+                writeByte(PHASECAL_CONFIG__TIMEOUT_MACROP, 0x14)
+                writeByte(RANGE_CONFIG__VCSEL_PERIOD_A, 0x07)
+                writeByte(RANGE_CONFIG__VCSEL_PERIOD_B, 0x05)
+                writeByte(RANGE_CONFIG__VALID_PHASE_HIGH, 0x38)
+                writeShort(SD_CONFIG__WOI_SD0, 0x0705)
+                writeShort(SD_CONFIG__INITIAL_PHASE_SD0, 0x0606)
             }
             DistanceMode.LONG -> {
-                writeByte(PHASECAL_CONFIG__TIMEOUT_MACROP, 0x0A);
-                writeByte(RANGE_CONFIG__VCSEL_PERIOD_A, 0x0F);
-                writeByte(RANGE_CONFIG__VCSEL_PERIOD_B, 0x0D);
+                writeByte(PHASECAL_CONFIG__TIMEOUT_MACROP, 0x0A)
+                writeByte(RANGE_CONFIG__VCSEL_PERIOD_A, 0x0F)
+                writeByte(RANGE_CONFIG__VCSEL_PERIOD_B, 0x0D)
                 writeByte(RANGE_CONFIG__VALID_PHASE_HIGH, 0xB8.toByte())
-                writeShort(SD_CONFIG__WOI_SD0, 0x0F0D);
-                writeShort(SD_CONFIG__INITIAL_PHASE_SD0, 0x0E0E);
+                writeShort(SD_CONFIG__WOI_SD0, 0x0F0D)
+                writeShort(SD_CONFIG__INITIAL_PHASE_SD0, 0x0E0E)
             }
             else -> throw IllegalStateException("Unknown distance mode value $distanceMode")
         }
@@ -361,6 +438,23 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
         }
         return timingBudgetInMs.toShort()
     }
+
+    /**
+     * Sets the timing budget for the sensor's distance measurement operation.
+     * The timing budget determines the measurement speed and accuracy.
+     * A larger timing budget allows for more accurate measurements, but takes longer.
+     *
+     * This function supports different timing budgets depending on the sensor's distance mode.
+     * For short distance mode, the timing budget must be one of: 15, 20, 33, 50, 100, 200, or 500 ms.
+     * For long distance mode, the timing budget must be one of: 20, 33, 50, 100, 200, or 500 ms.
+     *
+     * The function will throw an IllegalArgumentException if an unsupported timing budget is provided.
+     * It will throw an IllegalStateException if the sensor's distance mode cannot be determined.
+     *
+     * @param timingBudgetInMs the timing budget, in milliseconds
+     * @throws IllegalArgumentException if the timing budget is not supported for the current distance mode
+     * @throws IllegalStateException if the distance mode cannot be determined
+     */
     private fun setTimingBudgetInMs(timingBudgetInMs : Short) {
         val distanceMode = getDistanceMode()
         when(distanceMode) {
@@ -434,7 +528,7 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
         val clockPLLMask = 0x3FF
         val clockPLL = readShort(VL53L1_RESULT__OSC_CALIBRATE_VAL).toInt() and clockPLLMask
         val systemIntermeasurementPeriod = (clockPLL * interMeasurementMs * 1.075).toInt()
-        writeInt(VL53L1_SYSTEM__INTERMEASUREMENT_PERIOD,systemIntermeasurementPeriod);
+        writeInt(VL53L1_SYSTEM__INTERMEASUREMENT_PERIOD,systemIntermeasurementPeriod)
     }
     private fun getInterMeasurementInMs() : Int {
         val clockPLLMask = 0x3FF
@@ -456,6 +550,28 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
         val shiftedOffset = (rawOffset shl 3) shr 5
         return if(shiftedOffset > 1024) (shiftedOffset - 2048).toShort() else shiftedOffset
     }
+
+    private fun setROICenter(roiCenter: Byte    ) {
+        writeByte(ROI_CONFIG__USER_ROI_CENTRE_SPAD, roiCenter)
+    }
+    private fun getROICenter() : Byte {
+        return readByte(ROI_CONFIG__USER_ROI_CENTRE_SPAD)
+    }
+    private fun setROI(roi : ROI, justUpdateCenter : Boolean = false) {
+        writeByte(ROI_CONFIG__USER_ROI_CENTRE_SPAD, roi.spadROICenterValue.toByte());
+        if(!justUpdateCenter) {
+            val xyRegisterValue = ((roi.spadHeight - 1) shr 4) or (roi.spadWidth - 1)
+            writeByte(ROI_CONFIG__USER_ROI_REQUESTED_GLOBAL_XY_SIZE, xyRegisterValue.toByte())
+        }
+    }
+    private fun getROI() : ROI {
+        val spadROICenterValue = readByte(ROI_CONFIG__USER_ROI_CENTRE_SPAD).toInt()
+        val xyRegisterValue = readByte(ROI_CONFIG__USER_ROI_REQUESTED_GLOBAL_XY_SIZE).toInt()
+        val spadWidth = (xyRegisterValue and 0xF) + 1
+        val spadHeight = ((xyRegisterValue and 0xF0) shr 4) + 1
+        return ROI.createFromRegisterValues(spadWidth, spadHeight, spadROICenterValue)
+    }
+
     private fun readByte(index : Short): Byte {
         deviceClient.write(TypeConversion.shortToByteArray(index), I2cWaitControl.WRITTEN)
         return deviceClient.read(1)[0]
