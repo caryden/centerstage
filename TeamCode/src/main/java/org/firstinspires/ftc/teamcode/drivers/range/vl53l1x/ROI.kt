@@ -3,8 +3,6 @@ package org.firstinspires.ftc.teamcode.drivers.range.vl53l1x
 import android.graphics.Point
 import android.util.Log
 import org.opencv.core.Point3
-import java.lang.IllegalArgumentException
-import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -64,23 +62,46 @@ data class ROI(val X : Int, val Y : Int, val spadWidth: Int, val spadHeight: Int
             val Y = if(spadHeight % 2 == 0) spadCenter.y - spadHeight / 2 else spadCenter.y - (spadHeight - 1) / 2
             return ROI(X, Y, spadWidth, spadHeight, "ROI from register values")
         }
-    }
-    // this is taken from the application note https://www.st.com/resource/en/user_manual/um2555-vl53l1x-ultra-lite-driver-multiple-zone-implementation-stmicroelectronics.pdf
-
-    init {
-        if(spadHeight < MINIMUM_SPAD_HEIGHT || spadWidth < MINIMUM_SPAD_WIDTH) throw java.lang.IllegalArgumentException("ROI size must be at least 4x4 spads, spadWidth = $spadWidth, spadHeight = $spadHeight")
-        if(X < 0 || X > (16 - MINIMUM_SPAD_WIDTH ))
-            throw IllegalArgumentException("X must be between 0 and ${16 - MINIMUM_SPAD_WIDTH}, X = $X")
-        if(Y < 0 || Y > (16 - MINIMUM_SPAD_HEIGHT))
-            throw IllegalArgumentException("Y must be between 0 and ${16 - MINIMUM_SPAD_HEIGHT}, Y = $Y")
-
-        Log.i("VL53L1X", "ROI created ($name) with X = $X, Y = $Y, spadWidth = $spadWidth, spadHeight = $spadHeight")
-        Log.i("VL53L1X", "direction = $direction")
-        Log.i("VL53L1X", "spadROICenter = $spadROICenter")
-        Log.i("VL53L1X", "spadROICenterValue = $spadROICenterValue")
-    }
-    val direction : Point3
-        get() {
+        /**
+         * Calculates the center point of the region of interest (ROI) in the SPAD (Single Photon Avalanche Diode) array.
+         * The center point is determined based on the size of the ROI:
+         * If the ROI width is even, the center is the rightmost of the center two pixels.
+         * If the ROI height is even, the center is the topmost of the center two pixels.
+         * If the ROI width is odd, the center is the center pixel.
+         * If the ROI height is odd, the center is the center pixel.
+         *
+         * @param X The x-coordinate of the lower-left corner of the ROI.
+         * @param Y The y-coordinate of the lower-left corner of the ROI.
+         * @param spadWidth The width of the ROI in SPAD pixels.
+         * @param spadHeight The height of the ROI in SPAD pixels.
+         * @return A Point representing the center of the ROI.
+         */
+        private fun getSPADROICenter( X : Int,  Y : Int, spadWidth: Int, spadHeight: Int) : Point {
+            // if the ROI is an even number of pixels wide, the center is the rightmost (higher x value) pixel of the center two
+            // if the ROI is an even number of pixels tall, the center is the topmost (lower y value) pixel of the center two
+            // if the ROI is an odd number of pixels wide, the center is the center pixel
+            // if the ROI is an odd number of pixels tall, the center is the center pixel
+            val x = if(spadWidth % 2 == 0) X + spadWidth / 2 else X + (spadWidth + 1) / 2
+            val y = if(spadHeight % 2 == 0) Y + spadHeight / 2 - 1 else Y + (spadHeight - 1) / 2
+            return Point(x, y)
+        }
+        /**
+         * Retrieves the value from the SPAD center matrix at the given ROI center point.
+         *
+         * @param spadROICenter A Point representing the center of the ROI.
+         * @return The value from the SPAD center matrix at the given point.
+         */
+        private fun getSPADROICenterValue(spadROICenter : Point) : Int {
+            return VL53L1X_SPAD_CENTER_MATRIX[spadROICenter.y][spadROICenter.x]
+        }
+        /**
+         * Calculates a unit vector representing the direction of the ROI from the center of the SPAD array.
+         * The direction is calculated based on the field of view (FoV) of each SPAD and the deviation of the ROI center from the center of the array.
+         *
+         * @param spadROICenter A Point representing the center of the ROI.
+         * @return A Point3 representing the direction of the ROI as a unit vector.
+         */
+        private fun getDirection(spadROICenter : Point) : Point3 {
             // given that the spad array is 16x16 and the diagonal field of view (FoV) is 27 degrees, the FoV of each spad is 27 / sqrt(2) / 16 degrees
             // So as we move from the center of the ROI to the edge, the angle changes by 27 / sqrt(2) / 16 degrees per spad
             // from this, we can calculate a unit vector in the direction of the ROI from the center of the array
@@ -100,19 +121,22 @@ data class ROI(val X : Int, val Y : Int, val spadWidth: Int, val spadHeight: Int
 
             return Point3(x, y, z)
         }
-    val spadROICenter : Point
-        get() {
-            // if the ROI is an even number of pixels wide, the center is the rightmost (higher x value) pixel of the center two
-            // if the ROI is an even number of pixels tall, the center is the topmost (lower y value) pixel of the center two
-            // if the ROI is an odd number of pixels wide, the center is the center pixel
-            // if the ROI is an odd number of pixels tall, the center is the center pixel
-            val x = if(spadWidth % 2 == 0) X + spadWidth / 2 else X + (spadWidth + 1) / 2
-            val y = if(spadHeight % 2 == 0) Y + spadHeight / 2 - 1 else Y + (spadHeight - 1) / 2
-            return Point(x, y)
-        }
-    val spadROICenterValue : Int
-        get() {
-            val center = spadROICenter
-            return VL53L1X_SPAD_CENTER_MATRIX[center.y][center.x]
-        }
+    }
+    // this is taken from the application note https://www.st.com/resource/en/user_manual/um2555-vl53l1x-ultra-lite-driver-multiple-zone-implementation-stmicroelectronics.pdf
+    val spadROICenter = getSPADROICenter(X, Y, spadWidth, spadHeight)
+    val spadROICenterValue = getSPADROICenterValue(spadROICenter)
+    val direction = getDirection(spadROICenter)
+    init {
+        if(spadHeight < MINIMUM_SPAD_HEIGHT || spadWidth < MINIMUM_SPAD_WIDTH) throw java.lang.IllegalArgumentException("ROI size must be at least 4x4 spads, spadWidth = $spadWidth, spadHeight = $spadHeight")
+        if(X < 0 || X > (16 - MINIMUM_SPAD_WIDTH ))
+            throw IllegalArgumentException("X must be between 0 and ${16 - MINIMUM_SPAD_WIDTH}, X = $X")
+        if(Y < 0 || Y > (16 - MINIMUM_SPAD_HEIGHT))
+            throw IllegalArgumentException("Y must be between 0 and ${16 - MINIMUM_SPAD_HEIGHT}, Y = $Y")
+
+        Log.i("VL53L1X", "ROI created ($name) with X = $X, Y = $Y, spadWidth = $spadWidth, spadHeight = $spadHeight")
+        Log.i("VL53L1X", "direction = $direction")
+        Log.i("VL53L1X", "spadROICenter = $spadROICenter")
+        Log.i("VL53L1X", "spadROICenterValue = $spadROICenterValue")
+    }
+
 }

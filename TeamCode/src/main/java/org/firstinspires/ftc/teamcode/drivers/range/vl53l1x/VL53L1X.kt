@@ -178,7 +178,7 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
         )
 
         /**
-         * This represents the minimum spad width of 4 hoizontally, with the full 16 vertically.
+         * This represents the minimum spad width of 4 horizontally, with the full 16 vertically.
          * These go the opposite direction (in X values) because they are reversed vs the FoV
          * (i.e. when the rightmost spad is triggered it is from the left side of the FoV)
          * These are setup to scan left to right of the FoV so we scan reversed on the SPAD matrix.
@@ -239,9 +239,18 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
         // Sensor starts off disengaged so we can change things like I2C address. Need to engage
         this.deviceClient.engage();
     }
+    /**
+     * Returns the current ranging result.
+     *
+     * @return A `RangingResult` object representing the current ranging result.
+     */
     fun getRangingResult() : RangingResult {
         return currentRangingResult.get()
     }
+    /**
+     * Stops the ongoing ranging operation if one has been started.
+     * This function also cancels the job associated with the ranging operation.
+     */
     fun stop() {
         if (hasContinuousRangingBeenStarted)
             runBlocking {
@@ -250,16 +259,34 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
                 hasContinuousRangingBeenStarted = false
             }
     }
+    /**
+     * Closes the sensor and stops any ongoing ranging operation.
+     */
     override fun close() {
         stop()
     }
+    /**
+     * Returns the manufacturer of the sensor.
+     *
+     * @return A `HardwareDevice.Manufacturer` value representing the sensor's manufacturer.
+     */
     override fun getManufacturer(): HardwareDevice.Manufacturer {
         return HardwareDevice.Manufacturer.Other
     }
-
+    /**
+     * Returns the name of the sensor device.
+     *
+     * @return A string representing the name of the sensor device.
+     */
     override fun getDeviceName(): String {
         return "VL53L1X ToF Laser Ranging Sensor"
     }
+    /**
+     * Initializes the sensor. This involves validating the I2C communication, booting up the sensor,
+     * setting the distance mode, and setting the timing budget and inter-measurement period.
+     *
+     * @return `true` if the initialization was successful, `false` otherwise.
+     */
     override fun doInitialize(): Boolean {
         return if (validateBootupAndI2CCommunication()) {
             Log.i("VL53L1X", "i2c communication validated and sensor booted up")
@@ -271,7 +298,12 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
             true
         } else false
     }
-
+    /**
+     * Validates the boot-up process and I2C communication with the sensor.
+     * This involves reading the sensor state and checking certain register values against their expected values.
+     *
+     * @return `true` if the boot-up and I2C communication validation was successful, `false` otherwise.
+     */
     private fun validateBootupAndI2CCommunication(): Boolean {
         // first wait for sensor to boot up
         do {
@@ -292,6 +324,11 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
         }
         return true
     }
+    /**
+     * Initializes the sensor.
+     * This involves loading the default configuration, starting and stopping a ranging operation to initialize the sensor,
+     * and setting certain register values.
+     */
     private fun initializeSensor() {
         runBlocking {
             writeBytes(DEFAULT_CONFIG_START_INDEX, VL53L1X_DEFAULT_CONFIGURATION)
@@ -309,9 +346,19 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
 
         }
     }
+    /**
+     * Sets the regions of interest (ROIs) for the sensor to use in its ranging operations.
+     *
+     * @param roiList A list of `ROI` objects representing the regions of interest.
+     */
     fun setRegionsOfInterest(roiList: List<ROI>) {
          this.roiList.set(roiList)
     }
+    /**
+     * Starts the continuous ranging process if it has not already been started.
+     * This involves launching a coroutine that continuously switches between the regions of interest (ROIs),
+     * starts ranging operations, and retrieves the distance measurements.
+     */
     fun start()  {
         if(!hasContinuousRangingBeenStarted) {
 
@@ -363,17 +410,36 @@ class VL53L1X(deviceClient: I2cDeviceSynch?, deviceClientIsOwned: Boolean) :
             hasContinuousRangingBeenStarted = true
         }
     }
+    /**
+     * Starts a ranging operation.
+     * This involves writing to a specific register in the sensor.
+     */
     private fun startRanging() {
         writeByte(SYSTEM__MODE_START, 0x40)
         Log.i("VL53L1X", "started ranging")
     }
+    /**
+     * Stops a ranging operation.
+     * This involves writing to a specific register in the sensor.
+     */
     private fun stopRanging() {
         writeByte(SYSTEM__MODE_START, 0x00)
         Log.i("VL53L1X", "stopped ranging")
     }
+    /**
+     * Clears the interrupt flag on the sensor.
+     * This involves writing to a specific register in the sensor.
+     */
     private fun clearInterrupt() {
         writeByte(SYSTEM__INTERRUPT_CLEAR, 0x01)
     }
+    /**
+     * Checks if data is ready to be read from the sensor.
+     * This involves reading the interrupt status from a specific register in the sensor and
+     * comparing it against the interrupt polarity.
+     *
+     * @return `true` if data is ready to be read, `false` otherwise.
+     */
     private fun isDataReady() : Boolean {
         val interruptPolarity = getInterruptPolarity()
         val interruptStatus = 	readByte(GPIO__TIO_HV_STATUS);
