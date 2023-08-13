@@ -1,15 +1,11 @@
 package org.firstinspires.ftc.teamcode.opmodes.teleop
 
-import android.util.Log
 import com.acmerobotics.dashboard.FtcDashboard
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 import com.qualcomm.robotcore.util.ElapsedTime
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
-import org.firstinspires.ftc.teamcode.drivers.range.vl53l0x.VL53L0X
-import java.util.concurrent.atomic.AtomicInteger
+import edu.ncssm.ftc.electric_mayhem.i2c.vl53l0x.VL53L0X
 
 @TeleOp
 class VL53L0XSimpleRangeTest : LinearOpMode() {

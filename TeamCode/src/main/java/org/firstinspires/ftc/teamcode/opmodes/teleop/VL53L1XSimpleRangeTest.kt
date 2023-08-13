@@ -7,8 +7,9 @@ import com.acmerobotics.dashboard.telemetry.TelemetryPacket
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 import com.qualcomm.robotcore.util.ElapsedTime
-import org.firstinspires.ftc.teamcode.drivers.range.vl53l1x.RangingResult
-import org.firstinspires.ftc.teamcode.drivers.range.vl53l1x.VL53L1X
+import edu.ncssm.ftc.electric_mayhem.i2c.vl53l1x.RangingResult
+import edu.ncssm.ftc.electric_mayhem.i2c.vl53l1x.VL53L1X
+
 
 @TeleOp
 class VL53L1XSimpleRangeTest : LinearOpMode() {
