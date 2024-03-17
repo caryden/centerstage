@@ -5,7 +5,7 @@ import com.acmerobotics.dashboard.telemetry.MultipleTelemetry
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
 import com.qualcomm.robotcore.util.ElapsedTime
-import edu.ncssm.ftc.electric_mayhem.i2c.vl53l0x.VL53L0X
+import edu.ncssm.ftc.electricmayhem.devices.range.i2c.vl53l0x.VL53L0X
 
 @TeleOp
 class VL53L0XSimpleRangeTest : LinearOpMode() {

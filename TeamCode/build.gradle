@@ -17,6 +17,7 @@ apply from: '../build.dependencies.gradle'
 apply plugin: 'org.jetbrains.kotlin.android'
 
 repositories {
+    mavenLocal()
     maven { url = 'https://maven.brott.dev/' }
     maven { url 'https://jitpack.io' }
 }
@@ -31,7 +32,8 @@ android {
 
 dependencies {
     implementation project(':FtcRobotController')
-    implementation("com.github.caryden:electric-mayhem:v0.4")
+//    implementation("com.github.caryden:electric-mayhem:v0.6")
+    implementation 'edu.ncssm:electric-mayhem:0.8.2'
     implementation 'com.acmerobotics.dashboard:dashboard:0.4.14'
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
     annotationProcessor files('lib/OpModeAnnotationProcessor.jar')
